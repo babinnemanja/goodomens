@@ -1,4 +1,8 @@
-﻿using Rebus.Activation;
+﻿using Autofac;
+using GoodOmens.Host.CommandHandlers;
+using GoodOmens.Messages.Commands;
+using Rebus.Activation;
+using Rebus.Bus;
 using Rebus.Config;
 using Rebus.Logging;
 using System;
@@ -10,6 +14,9 @@ namespace GoodOmens.Host
     public class GoodOmensService
     {
         readonly Timer _timer;
+        private ContainerBuilder _builder;
+        private IContainer _container;
+
         public GoodOmensService()
         {
             _timer = new Timer(1000) { AutoReset = true };
@@ -25,22 +32,25 @@ namespace GoodOmens.Host
 
             var endpointName = string.Format("{0} ({1})", Assembly.GetEntryAssembly().GetName().Name, inputQueueName);
 
-            using (var adapter = new BuiltinHandlerActivator())
+            _builder = new ContainerBuilder();
+
+            _builder.RegisterHandlersFromAssemblyOf<CreateBookHandler>();
+
+            // register all implementations of IHandleMessage<'T> within Autofac
+            _builder.RegisterRebus((configurer, context) => configurer
+            .Logging(l => l.ColoredConsole(minLevel: LogLevel.Warn))
+            .Transport(t => t.UseAzureServiceBus(connectionString, inputQueueName))
+            .Options(o =>
             {
-                adapter.Handle<string>(async str =>
-                {
-                    Console.WriteLine("Got message from Adam: {0}", str);
-                });
+                o.SetNumberOfWorkers(2);
+                o.SetMaxParallelism(30);
+              
+            }));
 
-                Console.WriteLine("Starting {0} bus", endpointName);
+            // the bus is registered now, but it has not been started.... make all your other registrations, and then:
+            var _container = _builder.Build();
 
-                Configure.With(adapter)
-                    .Logging(l => l.ColoredConsole(minLevel: LogLevel.Warn))
-                    .Transport(t => t.UseAzureServiceBus(connectionString, inputQueueName))
-                    //.Subscriptions(s => s.StoreInRavenDb(Idoc, isCentralized: true))
-                    .Start();
-
-                Console.WriteLine(@"-------------------------------
+            Console.WriteLine(@"-------------------------------
                                     A) Subscribe to System.String
                                     B) Unsubscribe to System.String
                                     C) Publish System.String
@@ -48,41 +58,51 @@ namespace GoodOmens.Host
                                     -------------------------------
                                     ");
 
-                var keepRunning = true;
+            var keepRunning = true;
+            var bus = _container.Resolve<IBus>();
+            while (keepRunning)
+            {
+                var key = Console.ReadKey(true);
 
-                while (keepRunning)
+                switch (char.ToLower(key.KeyChar))
                 {
-                    var key = Console.ReadKey(true);
+                    case 'a':
+                        Console.WriteLine("Subscribing!");
+                        bus.Subscribe<CreateBook>().Wait();
+                        break;
 
-                    switch (char.ToLower(key.KeyChar))
-                    {
-                        case 'a':
-                            Console.WriteLine("Subscribing!");
-                            adapter.Bus.Subscribe<string>().Wait();
-                            break;
+                    case 'b':
+                        Console.WriteLine("Unsubscribing!");
+                        bus.Unsubscribe<string>().Wait();
+                        break;
 
-                        case 'b':
-                            Console.WriteLine("Unsubscribing!");
-                            adapter.Bus.Unsubscribe<string>().Wait();
-                            break;
+                    case 'c':
+                        Console.WriteLine("Publishing!");
 
-                        case 'c':
-                            Console.WriteLine("Publishing!");
-                            adapter.Bus.Publish(string.Format("Greetings to subscribers from {0}", endpointName)).Wait();
-                            break;
+                        var createBook = new CreateBook
+                        {
+                            Title = "Good omens"
+                        };
+                        bus.Publish(createBook).Wait();
 
-                        case 'q':
-                            Console.WriteLine("Quitting!");
-                            keepRunning = false;
-                            break;
-                    }
+                        break;
+
+                    case 'q':
+                        Console.WriteLine("Quitting!");
+                        keepRunning = false;
+                        bus.Dispose();
+                        break;
                 }
-
-                Console.WriteLine("Stopping the bus....");
             }
+
+            Console.WriteLine("Stopping the bus....");
         }
 
-        public void Stop() {
-            _timer.Stop(); }
-            }
+        public void Stop()
+        {
+            _container.Dispose();
+            _timer.Stop();
+            
+        }
+    }
 }

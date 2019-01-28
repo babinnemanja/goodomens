@@ -7,9 +7,14 @@
 
   <ItemGroup>
     <PackageReference Include="Rebus" Version="5.2.1" />
+    <PackageReference Include="Rebus.Autofac" Version="5.2.0" />
     <PackageReference Include="Rebus.AzureServiceBus" Version="7.0.0-a06" />
     <PackageReference Include="Rebus.RavenDb" Version="4.0.0" />
     <PackageReference Include="Topshelf" Version="4.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GoodOmens.Messages\GoodOmens.Messages.csproj" />
   </ItemGroup>
 
 </Project>
