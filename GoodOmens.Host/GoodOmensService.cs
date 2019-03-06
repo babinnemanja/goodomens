@@ -1,7 +1,7 @@
 ﻿using Autofac;
+using GoodOmens.Data;
 using GoodOmens.Host.CommandHandlers;
 using GoodOmens.Messages.Commands;
-using Rebus.Activation;
 using Rebus.Bus;
 using Rebus.Config;
 using Rebus.Logging;
@@ -40,6 +40,7 @@ namespace GoodOmens.Host
             _builder.RegisterRebus((configurer, context) => configurer
             .Logging(l => l.ColoredConsole(minLevel: LogLevel.Warn))
             .Transport(t => t.UseAzureServiceBus(connectionString, inputQueueName))
+            //.Subscriptions(s => s.StoreInRavenDb(DocumentStoreHolder.Store, isCentralized: true))
             .Options(o =>
             {
                 o.SetNumberOfWorkers(2);
@@ -83,6 +84,7 @@ namespace GoodOmens.Host
                         {
                             Title = "Good omens"
                         };
+                        Create.Omen();
                         bus.Publish(createBook).Wait();
 
                         break;

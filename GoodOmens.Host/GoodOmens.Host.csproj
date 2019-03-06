@@ -14,6 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\GoodOmens.Data\GoodOmens.Data.csproj" />
     <ProjectReference Include="..\GoodOmens.Messages\GoodOmens.Messages.csproj" />
   </ItemGroup>
 
